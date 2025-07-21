@@ -41,6 +41,8 @@ export default function Navbar() {
         </MenuButton>
         <MenuList>
           <MenuItem isDisabled>{session?.user.email}</MenuItem>
+          <MenuItem onClick={() => router.push('/upload')}>Upload Model</MenuItem>
+          <MenuItem onClick={() => router.push('/dashboard')}>Dashboard</MenuItem>
           <MenuItem onClick={handleLogout}>Logout</MenuItem>
         </MenuList>
       </Menu>
