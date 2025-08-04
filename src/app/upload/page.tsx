@@ -1,3 +1,5 @@
+// old upload/page.ts code
+
 'use client'
 
 import {
@@ -98,94 +100,92 @@ export default function UploadPage() {
   }
 
   const handleUpload = async () => {
-    if (!auth) {
-      toast({
-        title: 'Authentication Error',
-        description: 'You must be logged in to upload a model.',
-        status: 'error',
-      })
-      return
-    }
-
-    const userId = auth.user_id
-    if (!userId) {
-      toast({
-        title: 'User ID missing',
-        description: 'Unable to get user ID from session.',
-        status: 'error',
-      })
-      return
-    }
-
-    if (!modelFile || !name.trim()) {
-      toast({
-        title: 'Missing fields',
-        description: 'Please provide a model name and model file.',
-        status: 'warning',
-      })
-      return
-    }
-
-    setIsUploading(true)
-    setUploadProgress(0)
-
-    const formData = new FormData()
-    formData.append('model_file', modelFile)
-    formData.append('name', name.trim())
-    formData.append('user_id', userId)
-
-    if (csvFile) {
-      formData.append('test_file', csvFile)
-    }
-
-    try {
-      // Simulate progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval)
-            return prev
-          }
-          return prev + Math.random() * 20
-        })
-      }, 200)
-
-      await apiClient.post('/models/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-
-      clearInterval(progressInterval)
-      setUploadProgress(100)
-
-      setTimeout(() => {
+      if (!auth) {
         toast({
-          title: '🎉 Model uploaded successfully!',
-          description: 'Your model is now available in the dashboard',
+          title: 'Authentication Error',
+          description: 'You must be logged in to upload a model.',
+          status: 'error',
+        });
+        return;
+      }
+
+      const userId = auth.user_id;
+      if (!userId) {
+        toast({
+          title: 'User ID missing',
+          description: 'Unable to get user ID from session.',
+          status: 'error',
+        });
+        return;
+      }
+
+      if (!modelFile || !name.trim()) {
+        toast({
+          title: 'Missing fields',
+          description: 'Please provide a model name and model file.',
+          status: 'warning',
+        });
+        return;
+      }
+
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      const formData = new FormData();
+      formData.append('model_file', modelFile);
+      formData.append('name', name.trim());
+      formData.append('user_id', userId);
+      if (csvFile) formData.append('test_file', csvFile);
+
+      try {
+        const progressInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            if (prev >= 90) {
+              clearInterval(progressInterval);
+              return prev;
+            }
+            return prev + Math.random() * 20;
+          });
+        }, 200);
+
+        await apiClient.post('/models/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+
+        toast({
+          title: '🎉 Model Uploaded!',
+          description: csvFile
+            ? 'Your model and test file were successfully evaluated.'
+            : 'Your model is ready to view in the dashboard.',
           status: 'success',
+          duration: 4000,
+          isClosable: true,
+        });
+
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 500);
+      } catch (error: any) {
+        setUploadProgress(0);
+        const message =
+          error?.response?.data?.detail ||
+          error?.message ||
+          'Something went wrong during upload.';
+        toast({
+          title: '❌ Upload failed',
+          description: message,
+          status: 'error',
           duration: 5000,
-        })
-        router.push('/dashboard')
-      }, 500)
+          isClosable: true,
+        });
+      } finally {
+        setIsUploading(false);
+      }
+    };
 
-    } catch (error: any) {
-      setIsUploading(false)
-      setUploadProgress(0)
-      
-      const message =
-        typeof error === 'string'
-          ? error
-          : error?.response?.data?.detail || error?.message || 'Something went wrong'
-
-      toast({
-        title: '❌ Upload failed',
-        description: typeof message === 'string' ? message : JSON.stringify(message),
-        status: 'error',
-        isClosable: true,
-      })
-
-      console.error('Upload error:', error)
-    }
-  }
 
   const removeFile = (type: 'model' | 'csv') => {
     if (type === 'model') {
@@ -411,31 +411,29 @@ export default function UploadPage() {
                 {/* Upload Button */}
                 <Flex justify="center">
                   <Button
-                    size="lg"
-                    colorScheme="blue"
-                    onClick={handleUpload}
-                    isLoading={isUploading}
-                    loadingText="Uploading..."
-                    leftIcon={<FiUploadCloud />}
-                    borderRadius="xl"
-                    px={12}
-                    py={6}
-                    fontSize="lg"
-                    fontWeight="bold"
-                    bgGradient="linear(to-r, blue.500, purple.500)"
-                    _hover={{
-                      bgGradient: "linear(to-r, blue.600, purple.600)",
-                      transform: "translateY(-2px)",
-                    }}
-                    _active={{
-                      transform: "translateY(0)",
-                    }}
-                    transition="all 0.3s"
-                    shadow="lg"
-                    disabled={!modelFile || !name.trim() || isUploading}
-                  >
-                    {isUploading ? 'Uploading Model...' : 'Deploy Model'}
-                  </Button>
+                      size="lg"
+                      colorScheme="blue"
+                      onClick={handleUpload}
+                      isLoading={isUploading}
+                      loadingText="Uploading..."
+                      leftIcon={<FiUploadCloud />}
+                      borderRadius="xl"
+                      px={12}
+                      py={6}
+                      fontSize="lg"
+                      fontWeight="bold"
+                      bgGradient="linear(to-r, blue.500, purple.500)"
+                      _hover={{
+                        bgGradient: 'linear(to-r, blue.600, purple.600)',
+                        transform: 'translateY(-2px)',
+                      }}
+                      _active={{ transform: 'translateY(0)' }}
+                      transition="all 0.3s"
+                      shadow="lg"
+                      disabled={!modelFile || !name.trim() || isUploading}
+                    >
+                      {isUploading ? 'Uploading Model...' : 'Deploy Model'}
+                    </Button>
                 </Flex>
               </VStack>
             </CardBody>

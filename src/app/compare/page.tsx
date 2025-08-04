@@ -42,6 +42,7 @@ import {
 import apiClient from '@/lib/apiClient';
 import ModelComparisonChart from '@/components/ModelComparisonChart';
 import ModelRadarChart from '@/components/ModelRadarChart';
+import { useToast } from '@chakra-ui/react';
 
 type Model = {
   id: number;
@@ -58,6 +59,7 @@ export default function ComparePage() {
   const [modelA, setModelA] = useState<Model | null>(null);
   const [modelB, setModelB] = useState<Model | null>(null);
   const [loading, setLoading] = useState(true);
+  const toast = useToast();
 
   // Theme colors
   const bgGradient = useColorModeValue(
@@ -76,6 +78,14 @@ export default function ComparePage() {
         setModels(res.data);
       } catch (err) {
         console.error(err);
+        toast({
+            title: 'Failed to load models',
+            description: 'Could not fetch model data. Please try again later.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+        });
+
       } finally {
         setLoading(false);
       }

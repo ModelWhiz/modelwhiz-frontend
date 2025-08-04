@@ -1,8 +1,8 @@
 {
-  "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/[id]/page": "app/dashboard/[id]/page.js",
   "/login/page": "app/login/page.js",
-  "/compare/page": "app/compare/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
   "/upload/page": "app/upload/page.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js"
+  "/dashboard/[id]/page": "app/dashboard/[id]/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/compare/page": "app/compare/page.js"
 }
