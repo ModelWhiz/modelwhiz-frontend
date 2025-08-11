@@ -1,23 +1,14 @@
+// modelwhiz-frontend/src/components/ModelComparisonChart.tsx
 'use client';
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  CartesianGrid,
-  LabelList,
-} from 'recharts';
-import { Box, useColorModeValue } from '@chakra-ui/react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, LabelList } from 'recharts';
+import { Box } from '@chakra-ui/react';
 
 type Model = {
   name: string;
-  accuracy: number | null;
-  f1_score: number | null;
-  auc: number | null;
+  version: string;
+  task_type: 'classification' | 'regression' | null;
+  latest_metrics: { [key: string]: number } | null;
 };
 
 type Props = {
@@ -26,59 +17,38 @@ type Props = {
 };
 
 export default function ModelComparisonChart({ modelA, modelB }: Props) {
-  const bg = useColorModeValue('white', 'gray.700');
+  const isRegression = modelA.task_type === 'regression';
 
-  const data = [
-    {
-      metric: 'Accuracy',
-      [modelA.name]: Number(modelA.accuracy ?? 0),
-      [modelB.name]: Number(modelB.accuracy ?? 0),
-    },
-    {
-      metric: 'F1 Score',
-      [modelA.name]: Number(modelA.f1_score ?? 0),
-      [modelB.name]: Number(modelB.f1_score ?? 0),
-    },
-    {
-      metric: 'AUC',
-      [modelA.name]: Number(modelA.auc ?? 0),
-      [modelB.name]: Number(modelB.auc ?? 0),
-    },
-  ];
+  const metrics = isRegression 
+    ? [{ key: 'rmse', label: 'RMSE' }, { key: 'r2_score', label: 'R² Score' }]
+    : [{ key: 'accuracy', label: 'Accuracy' }, { key: 'f1_score', label: 'F1 Score' }, { key: 'auc', label: 'AUC' }];
+
+  // --- vvv THIS IS THE FIX vvv ---
+  // Use static keys (valueA, valueB) to prevent collisions.
+  const data = metrics.map(({ key, label }) => ({
+    metric: label,
+    valueA: modelA.latest_metrics?.[key] ?? 0,
+    valueB: modelB.latest_metrics?.[key] ?? 0,
+  }));
+  // --- ^^^ END OF FIX ^^^ ---
 
   return (
-    <Box w="100%" h="350px" p={4} bg={bg} borderRadius="md" shadow="sm" my={8}>
+    <Box w="100%" h="350px">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="metric" />
-          <YAxis domain={[0, 1]} tickFormatter={(v) =>
-            typeof v === 'number' ? v.toFixed(1) : v
-          } />
-          <Tooltip
-            formatter={(val: any) =>
-              typeof val === 'number' ? val.toFixed(3) : val
-            }
-          />
+          <YAxis domain={isRegression ? undefined : [0, 1]} />
+          <Tooltip formatter={(val: any) => typeof val === 'number' ? val.toFixed(4) : val} />
           <Legend />
-          <Bar dataKey={modelA.name} fill="#3182ce" radius={[4, 4, 0, 0]}>
-            <LabelList
-              dataKey={modelA.name}
-              position="top"
-              formatter={(val: any) =>
-                typeof val === 'number' ? val.toFixed(2) : val
-              }
-            />
+          {/* --- vvv USE STATIC dataKey AND DYNAMIC name FOR LEGEND vvv --- */}
+          <Bar dataKey="valueA" name={`${modelA.name} v${modelA.version}`} fill="#3182ce" radius={[4, 4, 0, 0]}>
+            <LabelList dataKey="valueA" position="top" formatter={(val: any) => typeof val === 'number' ? val.toFixed(2) : ''} />
           </Bar>
-          <Bar dataKey={modelB.name} fill="#38a169" radius={[4, 4, 0, 0]}>
-            <LabelList
-              dataKey={modelB.name}
-              position="top"
-              formatter={(val: any) =>
-                typeof val === 'number' ? val.toFixed(2) : val
-              }
-            />
+          <Bar dataKey="valueB" name={`${modelB.name} v${modelB.version}`} fill="#38a169" radius={[4, 4, 0, 0]}>
+            <LabelList dataKey="valueB" position="top" formatter={(val: any) => typeof val === 'number' ? val.toFixed(2) : ''} />
           </Bar>
+          {/* --- ^^^ END OF FIX ^^^ --- */}
         </BarChart>
       </ResponsiveContainer>
     </Box>

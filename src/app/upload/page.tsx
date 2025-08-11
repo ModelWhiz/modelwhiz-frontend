@@ -1,476 +1,125 @@
-// old upload/page.ts code
-
+// modelwhiz-frontend/src/app/upload/page.tsx
 'use client'
 
-import {
-  Box,
-  Button,
-  Heading,
-  Input,
-  VStack,
-  HStack,
-  useToast,
-  Text,
-  Container,
-  Card,
-  CardBody,
-  Icon,
-  Progress,
-  Badge,
-  Flex,
-  useColorModeValue,
-  Divider,
-  SimpleGrid,
-} from '@chakra-ui/react'
-import { ChangeEvent, useState, useRef } from 'react'
-import { FiUploadCloud, FiFile, FiDatabase, FiCheck, FiX } from 'react-icons/fi'
-import apiClient from '@/lib/apiClient'
+import { ChangeEvent, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  Box, Button, Heading, Input, VStack, useToast, Text, Container, Card, CardBody, Icon, Flex, useColorModeValue, Divider, SimpleGrid, FormLabel
+} from '@chakra-ui/react'
+import { FiUploadCloud, FiCheck } from 'react-icons/fi'
 import { useAuth } from '@/contexts/AuthContext'
+import { startEvaluation } from '@/lib/apiClient'
 
 export default function UploadPage() {
-  const [modelFile, setModelFile] = useState<File | null>(null)
-  const [csvFile, setCsvFile] = useState<File | null>(null)
-  const [name, setName] = useState('')
+  const [modelPackage, setModelPackage] = useState<File | null>(null)
+  const [datasetFile, setDatasetFile] = useState<File | null>(null)
+  const [modelName, setModelName] = useState('')
+  const [targetColumn, setTargetColumn] = useState('')
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [dragOver, setDragOver] = useState<'model' | 'csv' | null>(null)
   
-  const modelInputRef = useRef<HTMLInputElement>(null)
-  const csvInputRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
   const router = useRouter()
   const auth = useAuth() 
 
-  // Theme colors
-  const bgGradient = useColorModeValue(
-    'linear(to-br, blue.50, purple.50, pink.50)',
-    'linear(to-br, gray.900, purple.900, blue.900)'
-  )
-  const cardBg = useColorModeValue('white', 'gray.800')
-  const borderColor = useColorModeValue('gray.200', 'gray.600')
-  const accentColor = useColorModeValue('blue.500', 'blue.300')
-
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, type: 'model' | 'csv') => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, type: 'model' | 'dataset') => {
     const file = e.target.files?.[0]
     if (file) {
-      if (type === 'model') setModelFile(file)
-      else setCsvFile(file)
+      if (type === 'model') setModelPackage(file)
+      else setDatasetFile(file)
     }
-  }
-
-  const handleDrop = (e: React.DragEvent, type: 'model' | 'csv') => {
-    e.preventDefault()
-    setDragOver(null)
-    
-    const files = e.dataTransfer.files
-    if (files.length > 0) {
-      const file = files[0]
-      if (type === 'model') {
-        if (file.name.endsWith('.pkl') || file.name.endsWith('.joblib')) {
-          setModelFile(file)
-        } else {
-          toast({
-            title: 'Invalid file type',
-            description: 'Please upload a .pkl or .joblib file',
-            status: 'error',
-          })
-        }
-      } else {
-        if (file.name.endsWith('.csv')) {
-          setCsvFile(file)
-        } else {
-          toast({
-            title: 'Invalid file type',
-            description: 'Please upload a .csv file',
-            status: 'error',
-          })
-        }
-      }
-    }
-  }
-
-  const handleDragOver = (e: React.DragEvent, type: 'model' | 'csv') => {
-    e.preventDefault()
-    setDragOver(type)
-  }
-
-  const handleDragLeave = () => {
-    setDragOver(null)
   }
 
   const handleUpload = async () => {
-      if (!auth) {
-        toast({
-          title: 'Authentication Error',
-          description: 'You must be logged in to upload a model.',
-          status: 'error',
-        });
-        return;
-      }
+    if (!auth?.user_id) {
+      toast({ title: 'Authentication Error', status: 'error', duration: 3000, isClosable: true })
+      return
+    }
+    // This check is good, but the disabled button provides better UX
+    if (!modelPackage || !datasetFile || !modelName.trim() || !targetColumn.trim()) {
+      toast({ title: 'All fields are required', status: 'warning', duration: 3000, isClosable: true })
+      return
+    }
 
-      const userId = auth.user_id;
-      if (!userId) {
-        toast({
-          title: 'User ID missing',
-          description: 'Unable to get user ID from session.',
-          status: 'error',
-        });
-        return;
-      }
+    setIsUploading(true)
 
-      if (!modelFile || !name.trim()) {
-        toast({
-          title: 'Missing fields',
-          description: 'Please provide a model name and model file.',
-          status: 'warning',
-        });
-        return;
-      }
+    const formData = new FormData()
+    formData.append('model_package', modelPackage)
+    formData.append('dataset', datasetFile)
+    formData.append('model_name', modelName.trim())
+    formData.append('target_column', targetColumn.trim())
+    formData.append('user_id', auth.user_id)
 
-      setIsUploading(true);
-      setUploadProgress(0);
-
-      const formData = new FormData();
-      formData.append('model_file', modelFile);
-      formData.append('name', name.trim());
-      formData.append('user_id', userId);
-      if (csvFile) formData.append('test_file', csvFile);
-
-      try {
-        const progressInterval = setInterval(() => {
-          setUploadProgress(prev => {
-            if (prev >= 90) {
-              clearInterval(progressInterval);
-              return prev;
-            }
-            return prev + Math.random() * 20;
-          });
-        }, 200);
-
-        await apiClient.post('/models/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-
-        clearInterval(progressInterval);
-        setUploadProgress(100);
-
-        toast({
-          title: '🎉 Model Uploaded!',
-          description: csvFile
-            ? 'Your model and test file were successfully evaluated.'
-            : 'Your model is ready to view in the dashboard.',
-          status: 'success',
-          duration: 4000,
-          isClosable: true,
-        });
-
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 500);
-      } catch (error: any) {
-        setUploadProgress(0);
-        const message =
-          error?.response?.data?.detail ||
-          error?.message ||
-          'Something went wrong during upload.';
-        toast({
-          title: '❌ Upload failed',
-          description: message,
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-      } finally {
-        setIsUploading(false);
-      }
-    };
-
-
-  const removeFile = (type: 'model' | 'csv') => {
-    if (type === 'model') {
-      setModelFile(null)
-      if (modelInputRef.current) modelInputRef.current.value = ''
-    } else {
-      setCsvFile(null)
-      if (csvInputRef.current) csvInputRef.current.value = ''
+    try {
+      const response = await startEvaluation(formData);
+      toast({ title: '🚀 Evaluation Started!', description: 'You will be redirected to the results page.', status: 'success' })
+      router.push(`/evaluations/${response.job_id}`)
+    } catch (error: any) {
+      // The global error handler will now show the toast, but we still need to stop the spinner
+      setIsUploading(false)
     }
   }
 
+  // --- vvv NEW: Logic to check if the form is valid vvv ---
+  const isFormValid = modelPackage && datasetFile && modelName.trim() && targetColumn.trim();
+  // --- ^^^ END OF NEW LOGIC ^^^ ---
+
   return (
-    <Box minH="100vh" bgGradient={bgGradient}>
+    <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
       <Container maxW="4xl" py={12}>
         <VStack spacing={8} align="stretch">
-          {/* Header */}
           <Box textAlign="center">
-            <Icon as={FiUploadCloud} w={16} h={16} color={accentColor} mb={4} />
+            <Icon as={FiUploadCloud} w={16} h={16} color="purple.500" mb={4} />
             <Heading size="2xl" bgGradient="linear(to-r, blue.400, purple.500)" bgClip="text">
-              Upload Your Model
+              Create New Evaluation
             </Heading>
             <Text fontSize="lg" color="gray.500" mt={2}>
-              Deploy your machine learning model in seconds
+              Upload your model and data to get instant insights
             </Text>
           </Box>
 
-          {/* Upload Progress */}
-          {isUploading && (
-            <Card bg={cardBg} shadow="xl">
-              <CardBody>
-                <VStack spacing={4}>
-                  <Text fontWeight="semibold">Uploading your model...</Text>
-                  <Progress
-                    value={uploadProgress}
-                    size="lg"
-                    colorScheme="blue"
-                    w="full"
-                    borderRadius="full"
-                    bg="gray.100"
-                  />
-                  <Text fontSize="sm" color="gray.500">
-                    {Math.round(uploadProgress)}% complete
-                  </Text>
-                </VStack>
-              </CardBody>
-            </Card>
-          )}
-
-          {/* Main Upload Form */}
-          <Card bg={cardBg} shadow="2xl" borderRadius="2xl">
+          <Card bg={useColorModeValue('white', 'gray.800')} shadow="2xl" borderRadius="2xl">
             <CardBody p={8}>
-              <VStack spacing={8} align="stretch">
-                {/* Model Name Input */}
+              <VStack spacing={6} align="stretch">
                 <Box>
-                  <Text fontWeight="semibold" mb={3} fontSize="lg">
-                    Model Information
-                  </Text>
-                  <Input
-                    placeholder="Enter your model name (e.g., 'Sales Predictor v1.0')"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    size="lg"
-                    borderRadius="xl"
-                    border="2px"
-                    borderColor={borderColor}
-                    _focus={{
-                      borderColor: accentColor,
-                      boxShadow: `0 0 0 1px ${accentColor}`,
-                    }}
-                    bg={useColorModeValue('gray.50', 'gray.700')}
-                  />
+                  <FormLabel>Model Name</FormLabel>
+                  <Input placeholder="e.g., 'Sales Predictor v1.0'" value={modelName} onChange={(e) => setModelName(e.target.value)} size="lg" />
                 </Box>
-
+                 <Box>
+                  <FormLabel>Target Column Name</FormLabel>
+                  <Input placeholder="The exact name of the column you want to predict" value={targetColumn} onChange={(e) => setTargetColumn(e.target.value)} size="lg" />
+                </Box>
+                
                 <Divider />
 
-                {/* File Upload Section */}
-                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-                  {/* Model File Upload */}
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
                   <Box>
-                    <Text fontWeight="semibold" mb={3} fontSize="lg">
-                      Model File
-                      <Badge ml={2} colorScheme="red" variant="subtle">Required</Badge>
-                    </Text>
-                    
-                    <Box
-                      border="3px dashed"
-                      borderColor={dragOver === 'model' ? accentColor : borderColor}
-                      borderRadius="xl"
-                      p={8}
-                      textAlign="center"
-                      cursor="pointer"
-                      transition="all 0.3s"
-                      bg={dragOver === 'model' ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
-                      _hover={{
-                        borderColor: accentColor,
-                        bg: useColorModeValue('blue.50', 'blue.900'),
-                      }}
-                      onClick={() => modelInputRef.current?.click()}
-                      onDrop={(e) => handleDrop(e, 'model')}
-                      onDragOver={(e) => handleDragOver(e, 'model')}
-                      onDragLeave={handleDragLeave}
-                    >
-                      <Input
-                        ref={modelInputRef}
-                        type="file"
-                        accept=".pkl,.joblib"
-                        onChange={(e) => handleFileChange(e, 'model')}
-                        display="none"
-                      />
-                      
-                      {modelFile ? (
-                        <VStack spacing={3}>
-                          <Icon as={FiCheck} w={8} h={8} color="green.500" />
-                          <Text fontWeight="semibold" color="green.500">
-                            {modelFile.name}
-                          </Text>
-                          <Text fontSize="sm" color="gray.500">
-                            {(modelFile.size / 1024 / 1024).toFixed(2)} MB
-                          </Text>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            colorScheme="red"
-                            leftIcon={<FiX />}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeFile('model')
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        </VStack>
-                      ) : (
-                        <VStack spacing={3}>
-                          <Icon as={FiFile} w={12} h={12} color="gray.400" />
-                          <VStack spacing={1}>
-                            <Text fontWeight="semibold">
-                              Drop your model here or click to browse
-                            </Text>
-                            <Text fontSize="sm" color="gray.500">
-                              Supports .pkl and .joblib files
-                            </Text>
-                          </VStack>
-                        </VStack>
-                      )}
-                    </Box>
+                    <FormLabel>Model Package (.zip)</FormLabel>
+                     <Input type="file" accept=".zip" onChange={(e) => handleFileChange(e, 'model')} p={2} border="1px dashed gray"/>
+                     {modelPackage && <Text mt={2} color="green.500"><Icon as={FiCheck} /> {modelPackage.name}</Text>}
                   </Box>
-
-                  {/* CSV Test File Upload */}
-                  <Box>
-                    <Text fontWeight="semibold" mb={3} fontSize="lg">
-                      Test Data
-                      <Badge ml={2} colorScheme="blue" variant="subtle">Optional</Badge>
-                    </Text>
-                    
-                    <Box
-                      border="3px dashed"
-                      borderColor={dragOver === 'csv' ? accentColor : borderColor}
-                      borderRadius="xl"
-                      p={8}
-                      textAlign="center"
-                      cursor="pointer"
-                      transition="all 0.3s"
-                      bg={dragOver === 'csv' ? useColorModeValue('blue.50', 'blue.900') : 'transparent'}
-                      _hover={{
-                        borderColor: accentColor,
-                        bg: useColorModeValue('blue.50', 'blue.900'),
-                      }}
-                      onClick={() => csvInputRef.current?.click()}
-                      onDrop={(e) => handleDrop(e, 'csv')}
-                      onDragOver={(e) => handleDragOver(e, 'csv')}
-                      onDragLeave={handleDragLeave}
-                    >
-                      <Input
-                        ref={csvInputRef}
-                        type="file"
-                        accept=".csv"
-                        onChange={(e) => handleFileChange(e, 'csv')}
-                        display="none"
-                      />
-                      
-                      {csvFile ? (
-                        <VStack spacing={3}>
-                          <Icon as={FiCheck} w={8} h={8} color="green.500" />
-                          <Text fontWeight="semibold" color="green.500">
-                            {csvFile.name}
-                          </Text>
-                          <Text fontSize="sm" color="gray.500">
-                            {(csvFile.size / 1024).toFixed(2)} KB
-                          </Text>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            colorScheme="red"
-                            leftIcon={<FiX />}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeFile('csv')
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        </VStack>
-                      ) : (
-                        <VStack spacing={3}>
-                          <Icon as={FiDatabase} w={12} h={12} color="gray.400" />
-                          <VStack spacing={1}>
-                            <Text fontWeight="semibold">
-                              Upload test CSV (optional)
-                            </Text>
-                            <Text fontSize="sm" color="gray.500">
-                              For testing predictions after upload
-                            </Text>
-                          </VStack>
-                        </VStack>
-                      )}
-                    </Box>
+                   <Box>
+                    <FormLabel>Test Dataset (.csv)</FormLabel>
+                     <Input type="file" accept=".csv" onChange={(e) => handleFileChange(e, 'dataset')} p={2} border="1px dashed gray"/>
+                     {datasetFile && <Text mt={2} color="green.500"><Icon as={FiCheck} /> {datasetFile.name}</Text>}
                   </Box>
                 </SimpleGrid>
 
                 <Divider />
 
-                {/* Upload Button */}
                 <Flex justify="center">
                   <Button
-                      size="lg"
-                      colorScheme="blue"
-                      onClick={handleUpload}
-                      isLoading={isUploading}
-                      loadingText="Uploading..."
-                      leftIcon={<FiUploadCloud />}
-                      borderRadius="xl"
-                      px={12}
-                      py={6}
-                      fontSize="lg"
-                      fontWeight="bold"
-                      bgGradient="linear(to-r, blue.500, purple.500)"
-                      _hover={{
-                        bgGradient: 'linear(to-r, blue.600, purple.600)',
-                        transform: 'translateY(-2px)',
-                      }}
-                      _active={{ transform: 'translateY(0)' }}
-                      transition="all 0.3s"
-                      shadow="lg"
-                      disabled={!modelFile || !name.trim() || isUploading}
-                    >
-                      {isUploading ? 'Uploading Model...' : 'Deploy Model'}
-                    </Button>
+                    size="lg" colorScheme="purple" onClick={handleUpload} isLoading={isUploading}
+                    loadingText="Starting..." leftIcon={<FiUploadCloud />}
+                    // --- vvv THIS IS THE CHANGE vvv ---
+                    isDisabled={!isFormValid || isUploading}
+                    // --- ^^^ THIS IS THE CHANGE ^^^ ---
+                  >
+                    Start Evaluation
+                  </Button>
                 </Flex>
               </VStack>
             </CardBody>
           </Card>
-
-          {/* Info Cards */}
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
-            <Card bg={cardBg} shadow="lg">
-              <CardBody textAlign="center" py={6}>
-                <Icon as={FiFile} w={8} h={8} color="blue.500" mb={3} />
-                <Text fontWeight="semibold" mb={2}>Supported Formats</Text>
-                <Text fontSize="sm" color="gray.500">
-                  .pkl and .joblib model files
-                </Text>
-              </CardBody>
-            </Card>
-            
-            <Card bg={cardBg} shadow="lg">
-              <CardBody textAlign="center" py={6}>
-                <Icon as={FiUploadCloud} w={8} h={8} color="green.500" mb={3} />
-                <Text fontWeight="semibold" mb={2}>Fast Deployment</Text>
-                <Text fontSize="sm" color="gray.500">
-                  Models are ready in seconds
-                </Text>
-              </CardBody>
-            </Card>
-            
-            <Card bg={cardBg} shadow="lg">
-              <CardBody textAlign="center" py={6}>
-                <Icon as={FiDatabase} w={8} h={8} color="purple.500" mb={3} />
-                <Text fontWeight="semibold" mb={2}>Auto Testing</Text>
-                <Text fontSize="sm" color="gray.500">
-                  Optional CSV for instant validation
-                </Text>
-              </CardBody>
-            </Card>
-          </SimpleGrid>
         </VStack>
       </Container>
     </Box>

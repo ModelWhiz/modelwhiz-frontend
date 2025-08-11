@@ -21,6 +21,10 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
+// ...existing code...
+import { FaArrowUp, FaArrowDown, FaRocket, FaTrophy, FaChartLine, FaEye, FaLayerGroup, FaHistory } from 'react-icons/fa';
+// ...existing code...
+
 // Simple icons as SVG components
 const UploadIcon = (props : IconProps) => (
   <Icon viewBox="0 0 24 24" {...props}>
@@ -164,6 +168,16 @@ export default function Navbar() {
               Dashboard
             </MenuItem>
             
+            <MenuItem
+                onClick={() => router.push('/dashboard/evaluations')}
+                icon={<Icon as={FaHistory} />} // Use an appropriate icon
+                fontSize="sm"
+                fontWeight="medium"
+                _hover={{ bg: "teal.50", color: "teal.600" }}
+              >
+                Evaluation History
+            </MenuItem>
+
             <MenuItem
               onClick={() => router.push('/upload')}
               color="gray.700"

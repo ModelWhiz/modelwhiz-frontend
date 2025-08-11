@@ -97,12 +97,11 @@ type Metric = {
 type Model = {
   id: number;
   name: string;
+  version: string;
   filename: string;
   upload_time: string;
-  accuracy: number | null;
-  f1_score: number | null;
-  auc: number | null;
-  metrics: Metric[];
+  metrics: any[];
+  latest_metrics: { [key: string]: number } | null;
 };
 
 export default function ModelDetailsPage() {
@@ -115,6 +114,8 @@ export default function ModelDetailsPage() {
   const [isInsightOpen, setIsInsightOpen] = useState(false);
   const [insightsLoading, setInsightsLoading] = useState(false);
 
+
+  
   // Color mode values
   const bgGradient = useColorModeValue(
     'linear(to-br, purple.50, pink.50, blue.50)',
@@ -125,11 +126,14 @@ export default function ModelDetailsPage() {
   const textColor = useColorModeValue('gray.700', 'gray.200');
 
   // Calculate performance score
-  const getPerformanceScore = (model: Model) => {
-    const accuracy = model.accuracy || 0;
-    const f1 = model.f1_score || 0;
-    const auc = model.auc || 0;
-    return ((accuracy + f1 + auc) / 3 * 100).toFixed(1);
+  const getPerformanceScore = (model: Model | null) => {
+    if (!model?.latest_metrics) return '0.0';
+    if (model.latest_metrics.hasOwnProperty('rmse')) {
+      return ((model.latest_metrics.r2_score || 0) * 100).toFixed(1);
+    } else {
+      const { accuracy = 0, f1_score = 0, auc = 0 } = model.latest_metrics;
+      return ((((accuracy + f1_score + auc) / 3)) * 100).toFixed(1);
+    }
   };
 
   const getPerformanceColor = (score: number) => {
@@ -188,8 +192,8 @@ export default function ModelDetailsPage() {
       }
     };
 
-    fetchModel();
-  }, [id]);
+    if (id) fetchModel();
+  }, [id, toast]);
 
   // Animation variants
   const containerVariants = {
@@ -286,6 +290,7 @@ export default function ModelDetailsPage() {
   const performanceScore = parseFloat(getPerformanceScore(model));
   const performanceColor = getPerformanceColor(performanceScore);
   const PerformanceIcon = getPerformanceIcon(performanceScore);
+  const isRegression = model.latest_metrics?.hasOwnProperty('rmse');
 
   return (
     <Box minH="100vh" bgGradient={bgGradient}>
@@ -443,109 +448,34 @@ export default function ModelDetailsPage() {
               Performance Metrics
             </Heading>
 
-            <MotionGrid
-              columns={{ base: 1, md: 3 }}
-              spacing={6}
-              variants={containerVariants}
-            >
-              <MotionCard
-                variants={cardVariants}
-                whileHover="hover"
-                bg={cardBg}
-                borderRadius="xl"
-                boxShadow="lg"
-                border="1px"
-                borderColor="purple.100"
-                overflow="hidden"
-              >
-                <CardHeader bg="purple.50" py={4}>
-                  <HStack>
-                    <Icon as={FaCheckCircle} color="purple.500" />
-                    <Text fontWeight="bold" color="purple.700">Accuracy</Text>
-                  </HStack>
-                </CardHeader>
-                <CardBody textAlign="center" py={6}>
-                  <Text fontSize="3xl" fontWeight="bold" color="purple.600" mb={2}>
-                    {model.accuracy?.toFixed(3) ?? 'N/A'}
-                  </Text>
-                  <Badge
-                    colorScheme={model.accuracy && model.accuracy > 0.8 ? 'green' : 'orange'}
-                    borderRadius="full"
-                    px={3}
-                    py={1}
-                  >
-                    {model.accuracy && model.accuracy > 0.9 ? 'Excellent' : 
-                     model.accuracy && model.accuracy > 0.8 ? 'Good' : 
-                     model.accuracy && model.accuracy > 0.7 ? 'Fair' : 'Needs Improvement'}
-                  </Badge>
-                </CardBody>
-              </MotionCard>
-
-              <MotionCard
-                variants={cardVariants}
-                whileHover="hover"
-                bg={cardBg}
-                borderRadius="xl"
-                boxShadow="lg"
-                border="1px"
-                borderColor="blue.100"
-                overflow="hidden"
-              >
-                <CardHeader bg="blue.50" py={4}>
-                  <HStack>
-                    <Icon as={FaStar} color="blue.500" />
-                    <Text fontWeight="bold" color="blue.700">F1 Score</Text>
-                  </HStack>
-                </CardHeader>
-                <CardBody textAlign="center" py={6}>
-                  <Text fontSize="3xl" fontWeight="bold" color="blue.600" mb={2}>
-                    {model.f1_score?.toFixed(3) ?? 'N/A'}
-                  </Text>
-                  <Badge
-                    colorScheme={model.f1_score && model.f1_score > 0.8 ? 'green' : 'orange'}
-                    borderRadius="full"
-                    px={3}
-                    py={1}
-                  >
-                    {model.f1_score && model.f1_score > 0.9 ? 'Excellent' : 
-                     model.f1_score && model.f1_score > 0.8 ? 'Good' : 
-                     model.f1_score && model.f1_score > 0.7 ? 'Fair' : 'Needs Improvement'}
-                  </Badge>
-                </CardBody>
-              </MotionCard>
-
-              <MotionCard
-                variants={cardVariants}
-                whileHover="hover"
-                bg={cardBg}
-                borderRadius="xl"
-                boxShadow="lg"
-                border="1px"
-                borderColor="green.100"
-                overflow="hidden"
-              >
-                <CardHeader bg="green.50" py={4}>
-                  <HStack>
-                    <Icon as={FaTrophy} color="green.500" />
-                    <Text fontWeight="bold" color="green.700">AUC</Text>
-                  </HStack>
-                </CardHeader>
-                <CardBody textAlign="center" py={6}>
-                  <Text fontSize="3xl" fontWeight="bold" color="green.600" mb={2}>
-                    {model.auc?.toFixed(3) ?? 'N/A'}
-                  </Text>
-                  <Badge
-                    colorScheme={model.auc && model.auc > 0.8 ? 'green' : 'orange'}
-                    borderRadius="full"
-                    px={3}
-                    py={1}
-                  >
-                    {model.auc && model.auc > 0.9 ? 'Excellent' : 
-                     model.auc && model.auc > 0.8 ? 'Good' : 
-                     model.auc && model.auc > 0.7 ? 'Fair' : 'Needs Improvement'}
-                  </Badge>
-                </CardBody>
-              </MotionCard>
+            <MotionGrid columns={{ base: 1, md: 3 }} spacing={6} variants={containerVariants}>
+              {isRegression ? (
+                <>
+                  <MotionCard variants={cardVariants} bg={cardBg}>
+                    <CardHeader bg="teal.50"><HStack><Icon as={FaStar} color="teal.500" /><Text fontWeight="bold">RMSE</Text></HStack></CardHeader>
+                    <CardBody textAlign="center"><Text fontSize="3xl" fontWeight="bold">{model.latest_metrics?.rmse}</Text></CardBody>
+                  </MotionCard>
+                  <MotionCard variants={cardVariants} bg={cardBg}>
+                    <CardHeader bg="cyan.50"><HStack><Icon as={FaTrophy} color="cyan.500" /><Text fontWeight="bold">R² Score</Text></HStack></CardHeader>
+                    <CardBody textAlign="center"><Text fontSize="3xl" fontWeight="bold">{model.latest_metrics?.r2_score}</Text></CardBody>
+                  </MotionCard>
+                </>
+              ) : (
+                <>
+                  <MotionCard variants={cardVariants} bg={cardBg}>
+                    <CardHeader bg="purple.50"><HStack><Icon as={FaCheckCircle} color="purple.500" /><Text fontWeight="bold">Accuracy</Text></HStack></CardHeader>
+                    <CardBody textAlign="center"><Text fontSize="3xl" fontWeight="bold">{model.latest_metrics?.accuracy?.toFixed(3)}</Text></CardBody>
+                  </MotionCard>
+                  <MotionCard variants={cardVariants} bg={cardBg}>
+                    <CardHeader bg="blue.50"><HStack><Icon as={FaStar} color="blue.500" /><Text fontWeight="bold">F1 Score</Text></HStack></CardHeader>
+                    <CardBody textAlign="center"><Text fontSize="3xl" fontWeight="bold">{model.latest_metrics?.f1_score?.toFixed(3)}</Text></CardBody>
+                  </MotionCard>
+                  <MotionCard variants={cardVariants} bg={cardBg}>
+                    <CardHeader bg="green.50"><HStack><Icon as={FaTrophy} color="green.500" /><Text fontWeight="bold">AUC</Text></HStack></CardHeader>
+                    <CardBody textAlign="center"><Text fontSize="3xl" fontWeight="bold">{model.latest_metrics?.auc?.toFixed(3)}</Text></CardBody>
+                  </MotionCard>
+                </>
+              )}
             </MotionGrid>
           </MotionBox>
 
