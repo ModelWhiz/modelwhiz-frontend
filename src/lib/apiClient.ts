@@ -39,9 +39,29 @@ apiClient.interceptors.response.use(
   }
 );
 
+interface StartEvaluationPayload {
+  modelFile: File;
+  datasetFile: File;
+  modelName: string;
+  targetColumn: string;
+  userId: string;
+  preprocessorFile?: File | null;
+}
+
 export default apiClient
 
-export const startEvaluation = async (formData: FormData) => {
+export const startEvaluation = async (payload: StartEvaluationPayload) => {
+  const formData = new FormData();
+  formData.append('model_file', payload.modelFile);
+  formData.append('dataset', payload.datasetFile);
+  formData.append('model_name', payload.modelName);
+  formData.append('target_column', payload.targetColumn);
+  formData.append('user_id', payload.userId);
+  
+  if (payload.preprocessorFile) {
+    formData.append('preprocessor_file', payload.preprocessorFile);
+  }
+
   const response = await apiClient.post('/evaluations/start', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });

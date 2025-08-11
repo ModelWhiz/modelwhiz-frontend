@@ -1,127 +1,147 @@
 // modelwhiz-frontend/src/app/upload/page.tsx
-'use client'
+'use client';
 
-import { ChangeEvent, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { ChangeEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
-  Box, Button, Heading, Input, VStack, useToast, Text, Container, Card, CardBody, Icon, Flex, useColorModeValue, Divider, SimpleGrid, FormLabel
-} from '@chakra-ui/react'
-import { FiUploadCloud, FiCheck } from 'react-icons/fi'
-import { useAuth } from '@/contexts/AuthContext'
-import { startEvaluation } from '@/lib/apiClient'
+  Box, Button, Heading, Input, VStack, useToast, Text, Container, Card, CardBody, Icon, Flex,
+  useColorModeValue, Divider, FormLabel, HStack, Progress,
+} from '@chakra-ui/react';
+import { FiUploadCloud, FiFile, FiCheck, FiArrowRight, FiArrowLeft } from 'react-icons/fi';
+import { useAuth } from '@/contexts/AuthContext';
+import { startEvaluation } from '@/lib/apiClient';
+import Navbar from '@/components/Navbar';
+
+const FileInput = ({ label, accepted, file, onFileChange }: any) => (
+  <VStack w="full" align="start">
+    <FormLabel>{label}</FormLabel>
+    <Input type="file" accept={accepted} onChange={onFileChange} p={1.5} border="1px dashed" borderColor="gray.300" />
+    {file && <Text mt={2} fontSize="sm" color="green.500"><Icon as={FiCheck} mr={1} /> {file.name}</Text>}
+  </VStack>
+);
 
 export default function UploadPage() {
-  const [modelPackage, setModelPackage] = useState<File | null>(null)
-  const [datasetFile, setDatasetFile] = useState<File | null>(null)
-  const [modelName, setModelName] = useState('')
-  const [targetColumn, setTargetColumn] = useState('')
-  const [isUploading, setIsUploading] = useState(false)
+  const [step, setStep] = useState(1);
+  const [modelFile, setModelFile] = useState<File | null>(null);
+  const [preprocessorFile, setPreprocessorFile] = useState<File | null>(null);
+  const [datasetFile, setDatasetFile] = useState<File | null>(null);
+  const [hasPreprocessor, setHasPreprocessor] = useState<boolean | null>(null);
+  const [modelName, setModelName] = useState('');
+  const [targetColumn, setTargetColumn] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [trainingFile, setTrainingFile] = useState<File | null>(null);
   
-  const toast = useToast()
-  const router = useRouter()
-  const auth = useAuth() 
-
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, type: 'model' | 'dataset') => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (type === 'model') setModelPackage(file)
-      else setDatasetFile(file)
-    }
-  }
+  const toast = useToast();
+  const router = useRouter();
+  const auth = useAuth();
 
   const handleUpload = async () => {
-    if (!auth?.user_id) {
-      toast({ title: 'Authentication Error', status: 'error', duration: 3000, isClosable: true })
-      return
-    }
-    // This check is good, but the disabled button provides better UX
-    if (!modelPackage || !datasetFile || !modelName.trim() || !targetColumn.trim()) {
-      toast({ title: 'All fields are required', status: 'warning', duration: 3000, isClosable: true })
-      return
-    }
+    if (!auth?.user_id || !modelFile || !datasetFile) return;
+    setIsUploading(true);
 
-    setIsUploading(true)
-
-    const formData = new FormData()
-    formData.append('model_package', modelPackage)
-    formData.append('dataset', datasetFile)
-    formData.append('model_name', modelName.trim())
-    formData.append('target_column', targetColumn.trim())
-    formData.append('user_id', auth.user_id)
+    const payload = {
+      modelFile,
+      datasetFile,
+      modelName: modelName.trim(),
+      targetColumn: targetColumn.trim(),
+      userId: auth.user_id,
+      preprocessorFile,
+      trainingFile, // We can add it directly
+    };
 
     try {
-      const response = await startEvaluation(formData);
-      toast({ title: '🚀 Evaluation Started!', description: 'You will be redirected to the results page.', status: 'success' })
-      router.push(`/evaluations/${response.job_id}`)
-    } catch (error: any) {
-      // The global error handler will now show the toast, but we still need to stop the spinner
-      setIsUploading(false)
+      const response = await startEvaluation({
+          modelFile,
+          datasetFile,
+          modelName: modelName.trim(),
+          targetColumn: targetColumn.trim(),
+          userId: auth.user_id,
+          preprocessorFile,
+      });
+      toast({ title: '🚀 Evaluation Started!', status: 'success', isClosable: true });
+      router.push(`/evaluations/${response.job_id}`);
+    } catch (error) {
+      setIsUploading(false); // The global toast in apiClient will show the error
     }
-  }
+  };
 
-  // --- vvv NEW: Logic to check if the form is valid vvv ---
-  const isFormValid = modelPackage && datasetFile && modelName.trim() && targetColumn.trim();
-  // --- ^^^ END OF NEW LOGIC ^^^ ---
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <VStack spacing={6} align="stretch">
+            <Heading size="lg" textAlign="center">Step 1: Your Model</Heading>
+            <Input placeholder="Enter Model Name (e.g., 'Iris Classifier v1')" value={modelName} onChange={(e) => setModelName(e.target.value)} />
+            <FileInput label="Upload Model File (.pkl / .joblib)" accepted=".pkl,.joblib" file={modelFile} onFileChange={(e: ChangeEvent<HTMLInputElement>) => setModelFile(e.target.files?.[0] || null)} />
+            <Divider />
+            <FormLabel textAlign="center">Did this model require a separate preprocessor file?</FormLabel>
+            <HStack justify="center">
+              <Button colorScheme="purple" variant={hasPreprocessor === false ? 'solid' : 'outline'} onClick={() => { setHasPreprocessor(false); setPreprocessorFile(null); }}>No, just the model</Button>
+              <Button colorScheme="purple" variant={hasPreprocessor === true ? 'solid' : 'outline'} onClick={() => setHasPreprocessor(true)}>Yes, I have one</Button>
+            </HStack>
+            {hasPreprocessor === true && (
+              <FileInput label="Upload Preprocessor File (.pkl)" accepted=".pkl" file={preprocessorFile} onFileChange={(e: ChangeEvent<HTMLInputElement>) => setPreprocessorFile(e.target.files?.[0] || null)} />
+            )}
+            <Button
+              alignSelf="flex-end"
+              colorScheme="purple"
+              rightIcon={<FiArrowRight />}
+              isDisabled={!modelFile || !modelName.trim() || hasPreprocessor === null || (hasPreprocessor === true && !preprocessorFile)}
+              onClick={() => setStep(2)}
+            >
+              Next Step
+            </Button>
+          </VStack>
+        );
+      case 2:
+        return (
+          <VStack spacing={6} align="stretch">
+            <Heading size="lg" textAlign="center">Step 2: Evaluation Data</Heading>
+            <Input placeholder="Enter Target Column Name (e.g., 'species')" value={targetColumn} onChange={(e) => setTargetColumn(e.target.value)} />
+            <FileInput label="Upload Test Dataset (.csv)" accepted=".csv" file={datasetFile} onFileChange={(e: ChangeEvent<HTMLInputElement>) => setDatasetFile(e.target.files?.[0] || null)} />
+            {hasPreprocessor === false && ( // Only show this in "Simple Mode"
+              <FileInput 
+                label="Training Data Sample (.csv) - Optional, but recommended for accuracy" 
+                accepted=".csv" 
+                file={trainingFile} 
+                onFileChange={(e: ChangeEvent<HTMLInputElement>) => setTrainingFile(e.target.files?.[0] || null)} 
+              />
+            )}
+            <HStack w="full" justify="space-between" mt={4}>
+              <Button leftIcon={<FiArrowLeft />} onClick={() => setStep(1)}>Back</Button>
+              <Button
+                colorScheme="green"
+                leftIcon={<FiUploadCloud />}
+                isLoading={isUploading}
+                isDisabled={!datasetFile || !targetColumn.trim()}
+                onClick={handleUpload}
+              >
+                Start Evaluation
+              </Button>
+            </HStack>
+          </VStack>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
-    <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
-      <Container maxW="4xl" py={12}>
-        <VStack spacing={8} align="stretch">
-          <Box textAlign="center">
-            <Icon as={FiUploadCloud} w={16} h={16} color="purple.500" mb={4} />
-            <Heading size="2xl" bgGradient="linear(to-r, blue.400, purple.500)" bgClip="text">
-              Create New Evaluation
-            </Heading>
-            <Text fontSize="lg" color="gray.500" mt={2}>
-              Upload your model and data to get instant insights
-            </Text>
-          </Box>
-
-          <Card bg={useColorModeValue('white', 'gray.800')} shadow="2xl" borderRadius="2xl">
-            <CardBody p={8}>
-              <VStack spacing={6} align="stretch">
-                <Box>
-                  <FormLabel>Model Name</FormLabel>
-                  <Input placeholder="e.g., 'Sales Predictor v1.0'" value={modelName} onChange={(e) => setModelName(e.target.value)} size="lg" />
-                </Box>
-                 <Box>
-                  <FormLabel>Target Column Name</FormLabel>
-                  <Input placeholder="The exact name of the column you want to predict" value={targetColumn} onChange={(e) => setTargetColumn(e.target.value)} size="lg" />
-                </Box>
-                
-                <Divider />
-
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-                  <Box>
-                    <FormLabel>Model Package (.zip)</FormLabel>
-                     <Input type="file" accept=".zip" onChange={(e) => handleFileChange(e, 'model')} p={2} border="1px dashed gray"/>
-                     {modelPackage && <Text mt={2} color="green.500"><Icon as={FiCheck} /> {modelPackage.name}</Text>}
-                  </Box>
-                   <Box>
-                    <FormLabel>Test Dataset (.csv)</FormLabel>
-                     <Input type="file" accept=".csv" onChange={(e) => handleFileChange(e, 'dataset')} p={2} border="1px dashed gray"/>
-                     {datasetFile && <Text mt={2} color="green.500"><Icon as={FiCheck} /> {datasetFile.name}</Text>}
-                  </Box>
-                </SimpleGrid>
-
-                <Divider />
-
-                <Flex justify="center">
-                  <Button
-                    size="lg" colorScheme="purple" onClick={handleUpload} isLoading={isUploading}
-                    loadingText="Starting..." leftIcon={<FiUploadCloud />}
-                    // --- vvv THIS IS THE CHANGE vvv ---
-                    isDisabled={!isFormValid || isUploading}
-                    // --- ^^^ THIS IS THE CHANGE ^^^ ---
-                  >
-                    Start Evaluation
-                  </Button>
-                </Flex>
-              </VStack>
-            </CardBody>
-          </Card>
-        </VStack>
-      </Container>
-    </Box>
-  )
+    <>
+      <Navbar />
+      <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
+        <Container maxW="2xl" py={12}>
+          <VStack spacing={6}>
+            <Heading textAlign="center">Create New Evaluation</Heading>
+            <Progress value={(step / 2) * 100} colorScheme="purple" size="sm" w="full" borderRadius="full" />
+            <Card bg={useColorModeValue('white', 'gray.800')} shadow="2xl" borderRadius="2xl" w="full">
+              <CardBody p={8}>
+                {renderStep()}
+              </CardBody>
+            </Card>
+          </VStack>
+        </Container>
+      </Box>
+    </>
+  );
 }

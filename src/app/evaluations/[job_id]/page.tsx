@@ -2,13 +2,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation';
 import { 
   Box, Heading, Text, Spinner, VStack, useColorModeValue, Container, Card, CardBody, Alert, 
-  AlertIcon, SimpleGrid, Stat, StatLabel, StatNumber, Image, List, ListItem, ListIcon
+  AlertIcon, SimpleGrid, Stat, StatLabel, StatNumber, Image, List, ListItem, ListIcon,Button, Icon, Divider, HStack
 } from '@chakra-ui/react'
 import { getJobStatus, getJobResults } from '@/lib/apiClient'
-import { FaLightbulb } from 'react-icons/fa'
+import { FaLightbulb, FaArrowLeft, FaHistory } from 'react-icons/fa';
+import Navbar from '@/components/Navbar';
+
 
 interface Job {
   id: number;
@@ -22,6 +24,7 @@ interface Job {
 
 export default function EvaluationResultPage() {
   const params = useParams()
+  const router = useRouter();
   const jobId = Number(params.job_id)
   const [job, setJob] = useState<Job | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -142,6 +145,28 @@ export default function EvaluationResultPage() {
               </CardBody>
             </Card>
           )}
+
+          <Divider pt={4} />
+          <HStack spacing={4} justify="center" pt={4}>
+            <Button
+              leftIcon={<Icon as={FaArrowLeft} />}
+              onClick={() => router.push('/dashboard')}
+              colorScheme="gray"
+              variant="outline"
+              size="lg"
+            >
+              Back to Dashboard
+            </Button>
+            <Button
+              leftIcon={<Icon as={FaHistory} />}
+              onClick={() => router.push('/dashboard/evaluations')}
+              colorScheme="blue"
+              size="lg"
+            >
+              View All Evaluations
+            </Button>
+          </HStack>
+
         </VStack>
       )
     }
@@ -150,10 +175,15 @@ export default function EvaluationResultPage() {
   }
 
   return (
-    <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
-      <Container maxW="5xl" py={12}>
-        {renderContent()}
-      </Container>
-    </Box>
-  )
+    // --- vvv THIS IS THE NEW PAGE STRUCTURE vvv ---
+    <>
+      <Navbar />
+      <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
+        <Container maxW="5xl" py={12}>
+          {renderContent()}
+        </Container>
+      </Box>
+    </>
+    // --- ^^^ END OF NEW PAGE STRUCTURE ^^^ ---
+  );
 }
